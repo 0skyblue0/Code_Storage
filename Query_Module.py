@@ -1,7 +1,6 @@
 import requests
 import pandas as pd
 import json
-import xmltodict
 
 with open('API_Vworld.key', 'r',encoding='utf8') as f:
     key = f.read()

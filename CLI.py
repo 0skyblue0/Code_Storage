@@ -1,14 +1,17 @@
 import Query_Module_Legacy as QML
-import re
-import sys
-import os
 import Query_Module as QM
+import re
+import util_tool as ut
+import pandas as pd
 
 class CLI_Func():
     def __init__(self):
         DC = QML.Data_Controller()
         self.citycode_table = DC.getCityCode()
-        self.citycode_table['주소명'] = self.citycode_table['시도명'] + ' ' + self.citycode_table['시군구명'] + ' ' + self.citycode_table['읍면동명']
+        self.citycode_table['리명'] = self.citycode_table['리명'].fillna(' ')
+        self.citycode_table['주소명'] = self.citycode_table['시도명'] + ' ' + self.citycode_table['시군구명'] + ' ' +\
+            self.citycode_table['읍면동명'] + ' ' + self.citycode_table['리명']
+        self.citycode_table['주소명'] = self.citycode_table['주소명'].apply( lambda x: str(x).strip())
         self.urls ={
             '건축물연령속성조회' : 'https://api.vworld.kr/ned/data/getBuildingAge',
             '용도별건물속성조회' : 'https://api.vworld.kr/ned/data/getBuildingUse',
@@ -25,7 +28,8 @@ class CLI_Func():
             '건물실명조회' : 'https://api.vworld.kr/ned/data/buldRlnmList'
         }
         self.pnu = ''
-    
+        self.column_file = 'column_trans.pkl'
+
     def pnu_gen(self, addr1, addr2):
         # addr1 -> ex. 경기도 화성시 진안동  // addr2 -> ex. 871-4
         """pnu_data = land_laoder Data land_name = 행정구역 ex)제주특별자치도 서귀포시 표선면 하천리 locate_detail = 상세주소 ex) 산 125-1
@@ -75,28 +79,48 @@ class CLI_Func():
         'pnu를 이미 검색한번 했으면 자동으로 입력됨'
         if self.pnu != '':
             pnu = self.pnu
-        return QM.vworld_request(self.urls[url_name],{'pnu':pnu})
+        
+        table_data = QM.vworld_request(self.urls[url_name],{'pnu':pnu})
+        return ut.column_translate(table_data)
 
+    def enabled_column_list(self):
+        column_data = ut.column_data_control(self.column_file)
+        column_list_eng = []
+        column_list_kor = []
+        for table_name in column_data.keys():
+            column_list_eng += list(column_data[table_name].keys())
+            column_list_kor += list(column_data[table_name].values())
 
+        return list(set(column_list_eng)), list(set(column_list_kor))
 
+    def valid_enabled_column_select(self, select_list:list):
+        column_list_eng, column_list_kor = self.enabled_column_list()
+        invalid_list = [ column for column in select_list if (column not in column_list_eng) and (column not in column_list_kor)]
 
+        return invalid_list
 
+    def table_select(self, column_list:list):
+        table_list = []
+        reference_data = ut.column_data_control(self.column_file)
 
+        for column in column_list:
+            for table_name in reference_data.keys():
+                if column in reference_data[table_name].keys():
+                    table_list.append(table_name)
+                    break
+                elif column in reference_data[table_name].values():
+                    table_list.append(table_name)
+                    break
+        
+        return list(set(table_list))
 
+    def get_multiple_data(self, url_names:list):
+        data_tables = {}
 
+        for url in url_names:
+            data_tables[url] = self.get_data(url)
 
-
-
-
-
-
-
-
-
-
-
-
-
+        return data_tables
 
 
 if __name__=="__main__":
